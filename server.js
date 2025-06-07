@@ -121,8 +121,74 @@ app.post("/reasongpt", async (req, res) => {
     
 })
 
+async function sendImagesToGpt4(imageCache) {
+    const imageMessages = imageCache.map((base64Image) => ({
+      type: "image_url",
+      image_url: { url: `data:image/png;base64,${base64Image}` }
+    }));
+    const defaultPrompt = process.env.IMAGE_DEFAULT_PROMPT
+    // Construct API request with multiple images
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: String(defaultPrompt) },
+              ...imageMessages, // ✅ Dynamically add images
+            ],
+          },
+        ],
+        max_tokens: 3000,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GPT_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return response.data.choices[0].message.content;
+}
+
+app.post("/gpt4", async (req, res) => {
+    const authReq = req.body.auth;
+        const user = await prisma.user.findUnique({
+        where: {hardwareId: authReq}
+    })
+    if(!user) return res.status(400).json({response: "Invalid hardware ID or request limit reached"});
+    // TOdo
+    const now = new Date();
+    const hoursSinceLastReset = differenceInHours(now, user.lastResetAt);
+
+    if (hoursSinceLastReset >= 24) {
+        await prisma.user.update({
+            where: { hardwareId: authReq },
+            data: {
+                Usage: 0,
+                lastResetAt: now
+            }
+        });
+        user.Usage = 0; // update local variable for next check
+    }
+
+    if(user.Usage > 40) return res.status(400).json({response: "Usage limit reached for this day"});
+    
+    await prisma.user.update({
+        where: { hardwareId: authReq },
+        data: { Usage: { increment: 1 } }
+    });
+    const images = req.body.images;
+    const repson = await sendImagesToGpt4(images);
+    res.status(200).json({response: repson});
+
+})
+
 // 🚀 Start the server
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
+
