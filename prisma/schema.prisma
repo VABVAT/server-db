@@ -16,6 +16,8 @@ datasource db {
 model User {
   id Int @id 
   key String @unique 
-  hardwareId String @default("not-defined") 
+  hardwareId String @unique
+  lastResetAt DateTime @default(now()) 
   createdAt DateTime @default(now())
+  Usage Int @default(0)
 }
