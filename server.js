@@ -2,7 +2,6 @@ const express = require("express");
 const  cors = require("cors");
 const { PrismaClient } = require("@prisma/client");
 const OpenAI = require("openai");
-// const Openai = require("openai");
 const app = express();
 const prisma = new PrismaClient();
 const { differenceInHours } = require('date-fns');
